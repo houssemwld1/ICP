@@ -15,6 +15,7 @@ import tools.baseICP
 import tools.tools
 
 
+
 # check whether the data folder exists
 FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 RES_PATH = os.path.join(FILE_PATH, '../data/bunny_v2')
@@ -40,12 +41,15 @@ if __name__ == '__main__':
     src_tm = trimesh.load(mesh_fp)
 
     # ICP
-    H, ME = tools.baseICP.icp(src_tm, dst_tm, max_iterations=30)
+    H, ME = tools.baseICP.icp(src_tm, dst_tm, max_iterations=50)
     res_tm = src_tm.copy()
     res_tm.apply_transform(H)
 
     # plt.plot(ME)
     # plt.show()
+    # animation
+    tools.baseICP.icp_with_open3d_animation(src_tm, dst_tm, init_pose=None, max_iterations=50, tolerance=None, samplerate=1)
+
 
     # show the result
     if not args.matplot:

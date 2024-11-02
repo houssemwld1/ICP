@@ -66,6 +66,8 @@ def nearest_neighbor(src, dst):
     return distances.ravel(), indices.ravel()
 
 
+
+
 def icp(src_tm: "<class 'trimesh'>", dst_tm: "<class 'trimesh'>",
         init_pose=None, max_iterations=20, tolerance=None, samplerate=1):
     """
@@ -165,3 +167,69 @@ def icp(src_tm: "<class 'trimesh'>", dst_tm: "<class 'trimesh'>",
     print()
 
     return T, MeanError
+
+
+import open3d as o3d
+import numpy as np
+import cv2
+import os
+import os
+import numpy as np
+import open3d as o3d
+import cv2
+import imageio
+
+def icp_with_open3d_animation(src_tm, dst_tm, init_pose=None, max_iterations=20, tolerance=None, samplerate=0.1):
+    # Subsample the points for clarity
+    src_pts = np.array(src_tm.vertices)[::int(1/samplerate)]
+    dst_pts = np.array(dst_tm.vertices)[::int(1/samplerate)]
+    
+    # Initialize point clouds for Open3D visualization
+    src_o3d = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(src_pts))
+    dst_o3d = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(dst_pts))
+    
+    # Coloring the destination (reference) points red and source points blue
+    dst_o3d.paint_uniform_color([1, 0, 0])  # Red
+    src_o3d.paint_uniform_color([0, 0, 1])  # Blue
+
+    # Visualization setup
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    vis.add_geometry(dst_o3d)
+    vis.add_geometry(src_o3d)
+
+    # Prepare to save frames for GIF creation
+    frames = []
+
+    prev_error = 0
+    for i in range(max_iterations):
+        # ICP step
+        distances, indices = nearest_neighbor(src_pts, dst_pts)
+        matched_dst_pts = dst_pts[indices]
+        T, _, _ = best_fit_transform(src_pts, matched_dst_pts)
+        src_pts = (T[:3, :3] @ src_pts.T + T[:3, 3:4]).T
+
+        # Update source point cloud and visualize the transformation
+        src_o3d.points = o3d.utility.Vector3dVector(src_pts)
+        vis.update_geometry(src_o3d)
+        vis.poll_events()
+        vis.update_renderer()
+
+        # Capture frame for GIF
+        frame = np.asarray(vis.capture_screen_float_buffer(False))
+        frame = (frame * 255).astype(np.uint8)  # Convert from float to uint8
+        frames.append(frame)  # Save the captured frame
+
+        # Error check for convergence
+        mean_error = np.mean(distances)
+        if tolerance is not None and abs(prev_error - mean_error) < tolerance:
+            print(f"Converged at iteration {i + 1}")
+            break
+        prev_error = mean_error
+
+    vis.destroy_window()
+
+    # Export as a GIF using imageio
+    imageio.mimsave('icp_animation.gif', frames, duration=0.9)  # Adjust duration as needed
+
+    print("Animation saved as icp_animation.gif.")
